@@ -80,6 +80,7 @@ typedef struct __DisplayConfigure {
     uint16_t width;
     uint16_t height;
     uint32_t frameBufferSize;
+    bool fullRefresh;
 } DisplayConfigure_t;
 
 typedef struct __BoardTouchPins {
@@ -142,7 +143,8 @@ static const DisplayConfigure_t SH8501_AMOLED  = {
     SH8501_INIT_SEQUENCE_LENGHT,
     SH8501_WIDTH, //width
     SH8501_HEIGHT, //height
-    SH8501_WIDTH *SH8501_HEIGHT * sizeof(uint16_t) //frameBufferSize
+    SH8501_WIDTH *SH8501_HEIGHT * sizeof(uint16_t), //frameBufferSize
+    true //fullRefresh
 };
 
 static const int AMOLED_147_BUTTONTS[2] = {0, 21};
@@ -173,7 +175,8 @@ static const DisplayConfigure_t RM67162_AMOLED  = {
     RM67162_INIT_SEQUENCE_LENGHT,
     RM67162_WIDTH,//width
     RM67162_HEIGHT,//height
-    0//frameBufferSize
+    0,//frameBufferSize
+    false //fullRefresh
 };
 
 
@@ -197,7 +200,8 @@ static const DisplayConfigure_t RM690B0_AMOLED  = {
     RM690B0_INIT_SEQUENCE_LENGHT,
     RM690B0_WIDTH,//width
     RM690B0_HEIGHT,//height
-    0//frameBufferSize
+    0,//frameBufferSize
+    false //fullRefresh
 };
 static const int AMOLED_241_BUTTONTS[1] = {0};
 static const BoardPmuPins_t AMOLED_241_PMU_PINS =  {6/*SDA*/, 7/*SCL*/, 5/*IRQ*/};
@@ -258,7 +262,7 @@ enum AmoledBoardID {
     LILYGO_AMOLED_147 = 0x01,
     LILYGO_AMOLED_191,
     LILYGO_AMOLED_241,
-    LILYGO_AMOLED_UNKOWN,
+    LILYGO_AMOLED_UNKNOWN,
 };
 
 class LilyGo_AMOLED:
@@ -294,10 +298,18 @@ public:
     void setBrightness(uint8_t level);
     uint8_t getBrightness();
 
-    void setRotation(uint8_t r) __attribute__((error("setRotation Method Not implemented")));
+    // void setRotation(uint8_t r) __attribute__((error("setRotation Method Not implemented")));
+    void setRotation(uint8_t rotation);
+    uint8_t getRotation();
+
     void setAddrWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye);
     void pushColors(uint16_t *data, uint32_t len);
     void pushColors(uint16_t x, uint16_t y, uint16_t width, uint16_t hight, uint16_t *data);
+
+
+    bool installSD(int miso = -1, int mosi = -1, int sclk = -1, int cs = -1);
+
+    void uninstallSD();
 
     float readCoreTemp();
     void beginCore();
@@ -329,6 +341,8 @@ public:
     void sleep();
     void wakeup();
     bool hasTouch();
+
+    bool needFullRefresh();
 private:
     bool initBUS();
     bool initPMU();
@@ -340,6 +354,7 @@ private:
     uint8_t _brightness;
     const BoardsConfigure_t *boards;
     bool _touchOnline;
+    uint16_t _width, _height;
 
 #if ESP_IDF_VERSION > ESP_IDF_VERSION_VAL(5,0,0)
     temperature_sensor_handle_t temp_sensor;

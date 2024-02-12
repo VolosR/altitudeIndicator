@@ -50,7 +50,7 @@ const char *LilyGo_AMOLED::getName()
     } else if (boards == &BOARD_AMOLED_241) {
         return "2.41 inch";
     }
-    return "Unkonw";
+    return "Unknown";
 }
 
 uint8_t LilyGo_AMOLED::getBoardID()
@@ -62,7 +62,7 @@ uint8_t LilyGo_AMOLED::getBoardID()
     } else if (boards == &BOARD_AMOLED_241) {
         return LILYGO_AMOLED_241;
     }
-    return LILYGO_AMOLED_UNKOWN;
+    return LILYGO_AMOLED_UNKNOWN;
 }
 
 const BoardsConfigure_t *LilyGo_AMOLED::getBoarsdConfigure()
@@ -72,12 +72,12 @@ const BoardsConfigure_t *LilyGo_AMOLED::getBoarsdConfigure()
 
 uint16_t  LilyGo_AMOLED::width()
 {
-    return boards->display.width;
+    return _width;
 }
 
 uint16_t  LilyGo_AMOLED::height()
 {
-    return boards->display.height;
+    return _height;
 }
 
 void inline LilyGo_AMOLED::setCS()
@@ -288,6 +288,9 @@ bool LilyGo_AMOLED::initBUS()
     log_i("Power  > %d", boards->PMICEnPins);
     log_i("==================");
 
+    _width = boards->display.width;
+    _height = boards->display.height;
+
     pinMode(boards->display.rst, OUTPUT);
     pinMode(boards->display.cs, OUTPUT);
 
@@ -424,20 +427,23 @@ bool LilyGo_AMOLED::beginAMOLED_191(bool touchFunc)
             Wire.beginTransmission(CST816_SLAVE_ADDRESS);
             if (Wire.endTransmission() == 0) {
                 TouchDrvCSTXXX::setPins(boards->touch->rst, boards->touch->irq);
-                bool res = TouchDrvCSTXXX::init(Wire, boards->touch->sda, boards->touch->scl, CST816_SLAVE_ADDRESS);
+                bool res = TouchDrvCSTXXX::begin(Wire, CST816_SLAVE_ADDRESS, boards->touch->sda, boards->touch->scl);
                 if (!res) {
                     log_e("Failed to find CST816T - check your wiring!");
                     // return false;
                     _touchOnline = false;
                 } else {
-                    TouchDrvCSTXXX::setMaxCoordinates(RM67162_HEIGHT, RM67162_WIDTH);
                     _touchOnline = true;
+                    TouchDrvCSTXXX::setCenterButtonCoordinate(600, 120);  //AMOLED 1.91 inch
                 }
             }
         }
     } else {
         _touchOnline = false;
     }
+
+    setRotation(0);
+
     return true;
 }
 
@@ -461,13 +467,12 @@ bool LilyGo_AMOLED::beginAMOLED_241()
         Wire.beginTransmission(CST226SE_SLAVE_ADDRESS);
         if (Wire.endTransmission() == 0) {
             TouchDrvCSTXXX::setPins(boards->touch->rst, boards->touch->irq);
-            bool res = TouchDrvCSTXXX::init(Wire, boards->touch->sda, boards->touch->scl, CST226SE_SLAVE_ADDRESS);
+            bool res = TouchDrvCSTXXX::begin(Wire, CST226SE_SLAVE_ADDRESS, boards->touch->sda, boards->touch->scl);
             if (!res) {
                 log_e("Failed to find CST226SE - check your wiring!");
                 // return false;
             } else {
                 _touchOnline = true;
-                TouchDrvCSTXXX::setMaxCoordinates(RM690B0_HEIGHT, RM690B0_WIDTH);
             }
         }
     }
@@ -482,9 +487,68 @@ bool LilyGo_AMOLED::beginAMOLED_241()
             log_i("SD Card Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
         }
     }
+
+    setRotation(0);
+
     return true;
 }
 
+// Default SPI Pin
+#define AMOLED_191_DEFAULT_MISO  15
+#define AMOLED_191_DEFAULT_MOSI  14
+#define AMOLED_191_DEFAULT_SCLK  13
+#define AMOLED_191_DEFAULT_CS    12
+
+#define AMOLED_147_DEFAULT_MISO  47
+#define AMOLED_147_DEFAULT_MOSI  39
+#define AMOLED_147_DEFAULT_SCLK  38
+#define AMOLED_147_DEFAULT_CS    9
+/**
+ * @brief   Hang on SD card
+ * @note   If the specified Pin is not passed in, the default Pin will be used as the SPI
+ * @param  miso: 1.91 Inch [GPIO15] 1.47 Inch [GPIO47]    2.41 Inch defaults to onboard SD slot
+ * @param  mosi: 1.91 Inch [GPIO14] 1.47 Inch [GPIO39]    2.41 Inch defaults to onboard SD slot
+ * @param  sclk: 1.91 Inch [GPIO13] 1.47 Inch [GPIO38]    2.41 Inch defaults to onboard SD slot
+ * @param  cs:   1.91 Inch [GPIO12] 1.47 Inch [GPIO9]     2.41 Inch defaults to onboard SD slot
+ * @retval Returns true if successful, otherwise false
+ */
+bool LilyGo_AMOLED::installSD(int miso, int mosi, int sclk, int cs)
+{
+    if (boards == &BOARD_AMOLED_241) {
+        miso = boards->sd->miso;
+        mosi = boards->sd->mosi;
+        sclk = boards->sd->sck;
+        cs = boards->sd->cs;
+    } else if (boards == &BOARD_AMOLED_147) {
+        sclk = (sclk == -1)  ? AMOLED_147_DEFAULT_SCLK : sclk;
+        miso = (miso == -1) ? AMOLED_147_DEFAULT_MISO : miso;
+        mosi = (mosi == -1) ? AMOLED_147_DEFAULT_MOSI : mosi;
+        cs = (cs == -1)   ? AMOLED_147_DEFAULT_CS : cs;
+    } else if (boards == &BOARD_AMOLED_191) {
+        sclk = (sclk == -1)  ? AMOLED_191_DEFAULT_SCLK : sclk;
+        miso = (miso == -1) ? AMOLED_191_DEFAULT_MISO : miso;
+        mosi = (mosi == -1) ? AMOLED_191_DEFAULT_MOSI : mosi;
+        cs = (cs == -1)   ? AMOLED_191_DEFAULT_CS : cs;
+    }
+
+    SPI.begin(sclk, miso, mosi);
+
+    // Set mount point to /fs
+    if (!SD.begin(cs, SPI, 4000000U, "/fs")) {
+        log_e("Failed to dected SDCard!");
+        return false;
+    }
+    if (SD.cardType() != CARD_NONE) {
+        log_i("SD Card Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
+        return true;
+    }
+    return false;
+}
+
+void LilyGo_AMOLED::uninstallSD()
+{
+    SD.end();
+}
 
 bool LilyGo_AMOLED::beginAMOLED_147()
 {
@@ -517,7 +581,7 @@ bool LilyGo_AMOLED::beginAMOLED_147()
         log_e("Failed to find CHSC5816 - check your wiring!");
         // return false;
     } else {
-        TouchDrvCHSC5816::setMaxCoordinates(SH8501_HEIGHT, SH8501_WIDTH);
+        TouchDrvCHSC5816::setMaxCoordinates(_width, _height);
         TouchDrvCHSC5816::setSwapXY(true);
         TouchDrvCHSC5816::setMirrorXY(false, true);
     }
@@ -578,6 +642,10 @@ uint8_t LilyGo_AMOLED::getBrightness()
 
 void LilyGo_AMOLED::setAddrWindow(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye)
 {
+    xs += _offset_x;
+    ys += _offset_y;
+    xe += _offset_x;
+    ye += _offset_y;
     lcd_cmd_t t[3] = {
         {
             0x2A00, {
@@ -647,7 +715,7 @@ void LilyGo_AMOLED::pushColors(uint16_t x, uint16_t y, uint16_t width, uint16_t 
 
     if (boards->display.frameBufferSize) {
         assert(pBuffer);
-        uint16_t _x = this->width() - (y + hight);
+        uint16_t _x = this->height() - (y + hight);
         uint16_t _y = x;
         uint16_t _h = width;
         uint16_t _w = hight;
@@ -818,4 +886,121 @@ bool LilyGo_AMOLED::hasTouch()
     return false;
 }
 
+void LilyGo_AMOLED::setRotation(uint8_t rotation)
+{
+    uint8_t data = 0x00;
+    rotation %= 4;
+    _rotation = rotation;
+    if (boards == &BOARD_AMOLED_191) {
+        switch (_rotation) {
+        case 1:
+            data = RM67162_MADCTL_RGB;
+            _height = boards->display.height;
+            _width = boards->display.width;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(true);
+                TouchDrvCSTXXX::setMirrorXY(true, false);
+            }
+            break;
+        case 2:
+            data = RM67162_MADCTL_MV | RM67162_MADCTL_MY | RM67162_MADCTL_RGB;
+            _height = boards->display.width;
+            _width = boards->display.height;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(false);
+                TouchDrvCSTXXX::setMirrorXY(true, true);
+            }
+            break;
+        case 3:
+            data = RM67162_MADCTL_MX | RM67162_MADCTL_MY | RM67162_MADCTL_RGB;
+            _height = boards->display.height;
+            _width = boards->display.width;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(true);
+                TouchDrvCSTXXX::setMirrorXY(false, true);
+            }
+            break;
+        default:
+            data = RM67162_MADCTL_MX | RM67162_MADCTL_MV | RM67162_MADCTL_RGB;
+            _height = boards->display.width;
+            _width = boards->display.height;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(false);
+                TouchDrvCSTXXX::setMirrorXY(false, false);
+            }
+            break;
+        }
+        writeCommand(0x3600, &data, 1);
+    } else if (boards == &BOARD_AMOLED_241) {
+        switch (_rotation) {
+        case 1:
+            _offset_x = 16;
+            _offset_y = 0;
+            data = RM690B0_MADCTL_RGB;
+            _height = boards->display.width;
+            _width = boards->display.height;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(false);
+                TouchDrvCSTXXX::setMirrorXY(false, false);
+            }
+            break;
+        case 2:
+            _offset_x = 0;
+            _offset_y = 16;
+            data = RM690B0_MADCTL_MV | RM690B0_MADCTL_MY | RM690B0_MADCTL_RGB;
+            _height = boards->display.height;
+            _width = boards->display.width;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(true);
+                TouchDrvCSTXXX::setMirrorXY(true, false);
+            }
+            break;
+        case 3:
+            _offset_x = 16;
+            _offset_y = 0;
+            data = RM690B0_MADCTL_MX | RM690B0_MADCTL_MY | RM690B0_MADCTL_RGB;
+            _height = boards->display.width;
+            _width = boards->display.height;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(false);
+                TouchDrvCSTXXX::setMirrorXY(true, true);
+            }
+            break;
+        default:
+            _offset_x = 0;
+            _offset_y = 16;
+            data = RM690B0_MADCTL_MX | RM690B0_MADCTL_MV | RM690B0_MADCTL_RGB;
+            _height = boards->display.height;
+            _width = boards->display.width;
+            if (_touchOnline) {
+                TouchDrvCSTXXX::setMaxCoordinates(_width, _height);
+                TouchDrvCSTXXX::setSwapXY(true);
+                TouchDrvCSTXXX::setMirrorXY(false, true);
+            }
+            break;
+        }
+        writeCommand(0x3600, &data, 1);
+    } else {
+        Serial.println("The screen you are currently using does not support screen rotation!!!");
+    }
+}
 
+uint8_t LilyGo_AMOLED::getRotation()
+{
+    return (_rotation);
+}
+
+bool LilyGo_AMOLED::needFullRefresh()
+{
+    if (boards) {
+        return boards->display.fullRefresh;
+    }
+    return false;
+}

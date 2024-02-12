@@ -1,4 +1,6 @@
-
+#include "ssFont.h"
+#include "sFont.h"
+#include "mFont.h"
 #include "gauges.h"
 #include <Wire.h>
 #include <SPI.h>
