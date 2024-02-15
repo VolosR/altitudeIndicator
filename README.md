@@ -10,9 +10,4 @@ LIS3DSH high-performance three-axis "nano" accelerometer
 " target="_blank"><img src="http://img.youtube.com/vi/T6NyH34qUzA/0.jpg" 
 alt="IMAGE ALT TEXT HERE" width="480" height="320" border="10" /></a>
 
-<a href="https://ko-fi.com/volosprojects" target="_blank"><img src="https://github.com/VolosR/altitudeIndicator/blob/main/PlaneTDisplayAmoled/kofi.jpg" 
-alt="support my work here" width="400" height="200" border="10" /></a>
-
-
-https://github.com/VolosR/altitudeIndicator/blob/main/PlaneTDisplayAmoled/kofi.jpg
-![alt text](https://github.com/VolosR/altitudeIndicator/blob/main/PlaneTDisplayAmoled/kofi.jpg "Logo Title Text 1")
+### Thank you all!
